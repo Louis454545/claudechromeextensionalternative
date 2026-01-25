@@ -1,0 +1,24 @@
+{
+  "name": "@testextension/auth",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {},
+  "dependencies": {
+    "@testextension/db": "workspace:*",
+    "@testextension/env": "workspace:*",
+    "better-auth": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@testextension/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
