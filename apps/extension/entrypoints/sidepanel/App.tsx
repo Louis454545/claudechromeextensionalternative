@@ -1,7 +1,6 @@
-import wxtLogo from "/wxt.svg";
-import { useState } from "react";
+import { RefreshCw, AlertCircle } from "lucide-react";
+import { useState, useCallback } from "react";
 
-import reactLogo from "@/assets/react.svg";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,87 +10,110 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  fetchAccessibilityTree,
+  type AccessibilityNode,
+} from "@/lib/accessibility";
 
 function App() {
-  const [count, setCount] = useState(0);
+  const [accessibilityTree, setAccessibilityTree] =
+    useState<AccessibilityNode | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFetchTree = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const [tab] = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+
+      if (!tab?.id) {
+        throw new Error("No active tab found");
+      }
+
+      const tree = await fetchAccessibilityTree(tab.id);
+
+      if (tree) {
+        setAccessibilityTree(tree);
+      } else {
+        setError("Could not fetch accessibility tree");
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Unknown error occurred";
+      setError(message);
+      console.error("Failed to fetch accessibility tree:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   return (
-    <div className="h-screen w-full bg-background p-4 flex flex-col gap-4">
+    <div className="flex h-screen w-full flex-col bg-background">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <a href="https://wxt.dev" target="_blank" rel="noreferrer">
-          <img
-            src={wxtLogo}
-            className="h-8 transition-all hover:drop-shadow-[0_0_1em_#54bc4ae0]"
-            alt="WXT logo"
-          />
-        </a>
-        <a href="https://react.dev" target="_blank" rel="noreferrer">
-          <img
-            src={reactLogo}
-            className="h-8 transition-all hover:drop-shadow-[0_0_1em_#61dafbaa]"
-            alt="React logo"
-          />
-        </a>
+      <div className="flex items-center gap-3 border-b p-3">
         <div className="flex-1">
-          <h1 className="text-lg font-semibold">WXT + React</h1>
-          <p className="text-xs text-muted-foreground">Side Panel Extension</p>
+          <h1 className="text-base font-semibold">Accessibility Tree</h1>
         </div>
+        <Button
+          size="sm"
+          onClick={handleFetchTree}
+          disabled={isLoading}
+          className="gap-1.5"
+        >
+          <RefreshCw className={`size-3.5 ${isLoading ? "animate-spin" : ""}`} />
+          {isLoading ? "Loading..." : "Fetch"}
+        </Button>
       </div>
-
-      <Separator />
 
       {/* Content */}
-      <div className="flex-1 flex flex-col gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Counter Demo</CardTitle>
-            <CardDescription>Test the side panel functionality</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Current value:</span>
-                <Badge variant="secondary" className="text-lg px-3">
-                  {count}
-                </Badge>
-              </div>
+      <div className="flex-1 overflow-hidden p-3">
+        {error && (
+          <Card className="border-destructive/50 bg-destructive/10">
+            <CardContent className="flex items-center gap-2 py-3">
+              <AlertCircle className="size-4 text-destructive" />
+              <p className="text-sm text-destructive">{error}</p>
+            </CardContent>
+          </Card>
+        )}
 
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setCount(0)}
-                >
-                  Reset
-                </Button>
-                <Button className="flex-1" onClick={() => setCount((c) => c + 1)}>
-                  Increment
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {!accessibilityTree && !isLoading && !error && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Get Started</CardTitle>
+              <CardDescription>
+                Click "Fetch" to capture the accessibility tree.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        )}
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Development</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Edit <code className="bg-muted px-1 py-0.5 rounded text-xs">App.tsx</code> and save to
-              test HMR
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+        {isLoading && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Loading...</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Footer */}
-      <div className="text-center">
-        <p className="text-xs text-muted-foreground">
-          Powered by shadcn/ui + Tailwind CSS v4
-        </p>
+        {accessibilityTree && !isLoading && (
+          <ScrollArea className="h-full rounded border bg-muted/30">
+            <pre className="p-3 text-xs">
+              {JSON.stringify(accessibilityTree, null, 2)}
+            </pre>
+          </ScrollArea>
+        )}
       </div>
     </div>
   );
