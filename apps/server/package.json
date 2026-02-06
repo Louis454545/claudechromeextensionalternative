@@ -10,12 +10,14 @@
     "start": "bun run dist/index.js"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.38",
     "@hono/trpc-server": "^0.4.0",
     "@testextension/api": "workspace:*",
     "@testextension/auth": "workspace:*",
     "@testextension/db": "workspace:*",
     "@testextension/env": "workspace:*",
     "@trpc/server": "catalog:",
+    "ai": "^6.0.75",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
     "hono": "catalog:",

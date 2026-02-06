@@ -1,119 +1,111 @@
-import { RefreshCw, AlertCircle } from "lucide-react";
-import { useState, useCallback } from "react";
+import { useState } from "react";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationEmptyState,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
+import {
+  PromptInput,
+  PromptInputTextarea,
+  PromptInputSubmit,
+  PromptInputBody,
+  PromptInputFooter,
+} from "@/components/ai-elements/prompt-input";
+import { Suggestion, Suggestions } from "@/components/ai-elements/suggestion";
+import { ChatMessage } from "@/components/chat-message";
+import { useToolHandler } from "@/hooks/use-tool-handler";
+import { BotIcon } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  fetchAccessibilityTree,
-  type AccessibilityNode,
-} from "@/lib/accessibility";
+const SERVER_URL = "http://localhost:3000";
+
+const transport = new DefaultChatTransport({
+  api: `${SERVER_URL}/api/chat`,
+});
 
 function App() {
-  const [accessibilityTree, setAccessibilityTree] =
-    useState<AccessibilityNode | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [input, setInput] = useState("");
+  const { messages, sendMessage, status, addToolOutput, stop } = useChat({
+    transport,
+  });
 
-  const handleFetchTree = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
+  useToolHandler({ messages, addToolOutput });
 
-    try {
-      const [tab] = await browser.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
+  const isStreaming = status === "streaming" || status === "submitted";
 
-      if (!tab?.id) {
-        throw new Error("No active tab found");
-      }
+  const handleSubmit = () => {
+    if (!input.trim()) return;
+    sendMessage({ text: input });
+    setInput("");
+  };
 
-      const tree = await fetchAccessibilityTree(tab.id);
-
-      if (tree) {
-        setAccessibilityTree(tree);
-      } else {
-        setError("Could not fetch accessibility tree");
-      }
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Unknown error occurred";
-      setError(message);
-      console.error("Failed to fetch accessibility tree:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const handleSuggestionClick = (suggestion: string) => {
+    sendMessage({ text: suggestion });
+  };
 
   return (
     <div className="flex h-screen w-full flex-col bg-background">
-      {/* Header */}
-      <div className="flex items-center gap-3 border-b p-3">
-        <div className="flex-1">
-          <h1 className="text-base font-semibold">Accessibility Tree</h1>
-        </div>
-        <Button
-          size="sm"
-          onClick={handleFetchTree}
-          disabled={isLoading}
-          className="gap-1.5"
-        >
-          <RefreshCw className={`size-3.5 ${isLoading ? "animate-spin" : ""}`} />
-          {isLoading ? "Loading..." : "Fetch"}
-        </Button>
+      <div className="flex items-center gap-2 border-b px-3 py-2">
+        <BotIcon className="size-4" />
+        <h1 className="text-sm font-semibold">AI Assistant</h1>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-hidden p-3">
-        {error && (
-          <Card className="border-destructive/50 bg-destructive/10">
-            <CardContent className="flex items-center gap-2 py-3">
-              <AlertCircle className="size-4 text-destructive" />
-              <p className="text-sm text-destructive">{error}</p>
-            </CardContent>
-          </Card>
-        )}
+      <Conversation className="relative flex-1 overflow-hidden">
+        <ConversationContent>
+          {messages.length === 0 ? (
+            <ConversationEmptyState
+              title="AI Assistant"
+              description="Ask me anything about the current page or use me as a general assistant."
+              icon={<BotIcon className="size-6" />}
+            />
+          ) : (
+            messages.map((message) => (
+              <ChatMessage
+                key={message.id}
+                message={message}
+                isStreaming={isStreaming}
+              />
+            ))
+          )}
+        </ConversationContent>
+        <ConversationScrollButton />
+      </Conversation>
 
-        {!accessibilityTree && !isLoading && !error && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Get Started</CardTitle>
-              <CardDescription>
-                Click "Fetch" to capture the accessibility tree.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        )}
+      {messages.length === 0 && (
+        <div className="border-t px-3 py-2">
+          <Suggestions>
+            <Suggestion
+              suggestion="Analyze this page's accessibility"
+              onClick={handleSuggestionClick}
+            />
+            <Suggestion
+              suggestion="Summarize the page content"
+              onClick={handleSuggestionClick}
+            />
+            <Suggestion
+              suggestion="Find accessibility issues"
+              onClick={handleSuggestionClick}
+            />
+          </Suggestions>
+        </div>
+      )}
 
-        {isLoading && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Loading...</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-4 w-1/2" />
-            </CardContent>
-          </Card>
-        )}
-
-        {accessibilityTree && !isLoading && (
-          <ScrollArea className="h-full rounded border bg-muted/30">
-            <pre className="p-3 text-xs">
-              {JSON.stringify(accessibilityTree, null, 2)}
-            </pre>
-          </ScrollArea>
-        )}
+      <div className="border-t p-3">
+        <PromptInput onSubmit={handleSubmit}>
+          <PromptInputBody>
+            <PromptInputTextarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder="Ask about this page..."
+            />
+          </PromptInputBody>
+          <PromptInputFooter>
+            <div />
+            <PromptInputSubmit status={status} onStop={stop} />
+          </PromptInputFooter>
+        </PromptInput>
       </div>
     </div>
   );

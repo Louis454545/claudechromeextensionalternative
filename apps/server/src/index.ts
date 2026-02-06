@@ -6,6 +6,7 @@ import { env } from "@testextension/env/server";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { chatHandler } from "./chat";
 
 const app = new Hono();
 
@@ -13,14 +14,21 @@ app.use(logger());
 app.use(
   "/*",
   cors({
-    origin: env.CORS_ORIGIN,
+    origin: (origin) => {
+      if (origin === env.CORS_ORIGIN) return origin;
+      if (origin?.startsWith("chrome-extension://")) return origin;
+      return null;
+    },
     allowMethods: ["GET", "POST", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
+    exposeHeaders: ["X-Conversation-Id"],
     credentials: true,
   }),
 );
 
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw));
+
+app.post("/api/chat", (c) => chatHandler(c));
 
 app.use(
   "/trpc/*",
